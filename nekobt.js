@@ -16,12 +16,10 @@ function idToInfo(id) {
 export default new class NekoBT {
   url = atob("aHR0cHM6Ly9uZWtvYnQudG8vYXBpL3YxLw==");
 
-  // ❌ REMOVED _media() completely (this was breaking everything)
-
   _map(entries, batch = false, high = true) {
     const results = entries?.data?.results;
 
-    // ✅ prevents "n is not iterable"
+    // FIX: prevents "n is not iterable"
     if (!Array.isArray(results)) return [];
 
     return results.map(entry => ({
@@ -77,4 +75,3 @@ export default new class NekoBT {
     }
   }
 };
-
