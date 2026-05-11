@@ -1,0 +1,23 @@
+async single({ tvdbId, tmdbId, imdbId, episode, fetch }, options) {
+  const searchURL = new URL(this.url + "torrents/search");
+
+  if (tmdbId) searchURL.searchParams.append("tmdb_id", tmdbId);
+  if (tvdbId) searchURL.searchParams.append("tvdb_id", tvdbId);
+  if (imdbId) searchURL.searchParams.append("imdb_id", imdbId);
+
+  searchURL.searchParams.append("fansub_lang", "en,enm");
+  searchURL.searchParams.append("sub_lang", "en,enm");
+
+  if (episode != null) {
+    searchURL.searchParams.append("episode", episode);
+  }
+
+  const res = await fetch(searchURL.toString());
+  const json = await res.json();
+
+  if (json.error) {
+    throw new Error("NekoBT: " + json.message);
+  }
+
+  return this._map(json, false, true);
+}
