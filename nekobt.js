@@ -1,7 +1,3 @@
-const mappings = fetch(
-  atob("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL1RoYVVua25vd24vYW5pbWUtbGlzdHMtdHMvcmVmcy9oZWFkcy9tYWluL2RhdGEvbmJ0LW1hcHBpbmcuanNvbg==")
-).then(res => res.json());
-
 const m = BigInt("1735689600000");
 
 function idToInfo(id) {
@@ -20,38 +16,13 @@ function idToInfo(id) {
 export default new class NekoBT {
   url = atob("aHR0cHM6Ly9uZWtvYnQudG8vYXBpL3YxLw==");
 
-  async _media({ tvdbId, tmdbId, imdbId, fetch }) {
-    const map = await mappings;
-
-    const nekoID =
-      map?.tvdb?.[tvdbId] ??
-      map?.tmdb?.[tmdbId] ??
-      map?.imdb?.[imdbId];
-
-    if (!nekoID) {
-      throw new Error("No NekoBT mapping found for provided anime.");
-    }
-
-    const res = await fetch(this.url + `media/${nekoID}`);
-    const json = await res.json();
-
-    if (json.error) {
-      throw new Error("NekoBT: " + json.message);
-    }
-
-    return {
-      nekoID,
-      data: json.data
-    };
-  }
+  // ❌ REMOVED _media() completely (this was breaking everything)
 
   _map(entries, batch = false, high = true) {
     const results = entries?.data?.results;
 
-    // ✅ FIX for "n is not iterable"
-    if (!Array.isArray(results)) {
-      return [];
-    }
+    // ✅ prevents "n is not iterable"
+    if (!Array.isArray(results)) return [];
 
     return results.map(entry => ({
       title: entry.title,
@@ -67,36 +38,30 @@ export default new class NekoBT {
     }));
   }
 
-  async single({ tvdbId, tvdbEId, tmdbId, imdbId, episode, fetch }) {
+  async single({ tvdbId, tmdbId, imdbId, episode, fetch }) {
     if (!navigator.onLine) return [];
 
-    const { data, nekoID } = await this._media({
-      tvdbId,
-      tmdbId,
-      imdbId,
-      fetch
-    });
+    const searchURL = new URL(this.url + "torrents/search");
 
-    const ep =
-      data?.episodes?.find(e => e.tvdbId === tvdbEId) ??
-      data?.episodes?.find(e => e.episode === episode);
+    if (tmdbId) searchURL.searchParams.append("tmdb_id", tmdbId);
+    if (tvdbId) searchURL.searchParams.append("tvdb_id", tvdbId);
+    if (imdbId) searchURL.searchParams.append("imdb_id", imdbId);
 
-    let searchURL =
-      `${this.url}torrents/search?media_id=${nekoID}` +
-      `&fansub_lang=en%2Cenm&sub_lang=en%2Cenm`;
+    searchURL.searchParams.append("fansub_lang", "en,enm");
+    searchURL.searchParams.append("sub_lang", "en,enm");
 
-    if (ep?.id) {
-      searchURL += `&episode_ids=${ep.id}`;
+    if (episode != null) {
+      searchURL.searchParams.append("episode", episode);
     }
 
-    const res = await fetch(searchURL);
+    const res = await fetch(searchURL.toString());
     const json = await res.json();
 
     if (json.error) {
       throw new Error("NekoBT: " + json.message);
     }
 
-    return this._map(json, !!tvdbEId);
+    return this._map(json, false, true);
   }
 
   batch = this.single;
