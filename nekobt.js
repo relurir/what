@@ -1,23 +1,114 @@
-async single({ tvdbId, tmdbId, imdbId, episode, fetch }, options) {
-  const searchURL = new URL(this.url + "torrents/search");
+const mappings = fetch(
+  atob("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL1RoYVVua25vd24vYW5pbWUtbGlzdHMtdHMvcmVmcy9oZWFkcy9tYWluL2RhdGEvbmJ0LW1hcHBpbmcuanNvbg==")
+).then(res => res.json());
 
-  if (tmdbId) searchURL.searchParams.append("tmdb_id", tmdbId);
-  if (tvdbId) searchURL.searchParams.append("tvdb_id", tvdbId);
-  if (imdbId) searchURL.searchParams.append("imdb_id", imdbId);
+const m = BigInt("1735689600000");
 
-  searchURL.searchParams.append("fansub_lang", "en,enm");
-  searchURL.searchParams.append("sub_lang", "en,enm");
+function idToInfo(id) {
+  let r = BigInt(id);
+  const i = (r >> 8n) + m;
+  const n = (r >> 4n) & BigInt(15);
+  const o = r & BigInt(15);
 
-  if (episode != null) {
-    searchURL.searchParams.append("episode", episode);
-  }
-
-  const res = await fetch(searchURL.toString());
-  const json = await res.json();
-
-  if (json.error) {
-    throw new Error("NekoBT: " + json.message);
-  }
-
-  return this._map(json, false, true);
+  return {
+    time: Number(i),
+    type: Number(n),
+    increment: Number(o)
+  };
 }
+
+export default new class NekoBT {
+  url = atob("aHR0cHM6Ly9uZWtvYnQudG8vYXBpL3YxLw==");
+
+  async _media({ tvdbId, tmdbId, imdbId, fetch }) {
+    const map = await mappings;
+
+    const nekoID =
+      map?.tvdb?.[tvdbId] ??
+      map?.tmdb?.[tmdbId] ??
+      map?.imdb?.[imdbId];
+
+    if (!nekoID) {
+      throw new Error("No NekoBT mapping found for provided anime.");
+    }
+
+    const res = await fetch(this.url + `media/${nekoID}`);
+    const json = await res.json();
+
+    if (json.error) {
+      throw new Error("NekoBT: " + json.message);
+    }
+
+    return {
+      nekoID,
+      data: json.data
+    };
+  }
+
+  _map(entries, batch = false, high = true) {
+    const results = entries?.data?.results;
+
+    // ✅ FIX for "n is not iterable"
+    if (!Array.isArray(results)) {
+      return [];
+    }
+
+    return results.map(entry => ({
+      title: entry.title,
+      link: `${this.url}torrents/${entry.id}/download?public=true`,
+      seeders: Number(entry.seeders ?? 0),
+      leechers: Number(entry.leechers ?? 0),
+      downloads: Number(entry.completed ?? 0),
+      hash: entry.infohash,
+      size: Number(entry.filesize ?? 0),
+      accuracy: high ? "high" : "medium",
+      type: (entry.level ?? 0) >= 3 ? "alt" : undefined,
+      date: entry.id ? new Date(idToInfo(entry.id).time) : null
+    }));
+  }
+
+  async single({ tvdbId, tvdbEId, tmdbId, imdbId, episode, fetch }) {
+    if (!navigator.onLine) return [];
+
+    const { data, nekoID } = await this._media({
+      tvdbId,
+      tmdbId,
+      imdbId,
+      fetch
+    });
+
+    const ep =
+      data?.episodes?.find(e => e.tvdbId === tvdbEId) ??
+      data?.episodes?.find(e => e.episode === episode);
+
+    let searchURL =
+      `${this.url}torrents/search?media_id=${nekoID}` +
+      `&fansub_lang=en%2Cenm&sub_lang=en%2Cenm`;
+
+    if (ep?.id) {
+      searchURL += `&episode_ids=${ep.id}`;
+    }
+
+    const res = await fetch(searchURL);
+    const json = await res.json();
+
+    if (json.error) {
+      throw new Error("NekoBT: " + json.message);
+    }
+
+    return this._map(json, !!tvdbEId);
+  }
+
+  batch = this.single;
+  movie = this.single;
+
+  async test() {
+    try {
+      const res = await fetch(this.url + "announcements");
+      if (!res.ok) throw new Error("API unreachable");
+      return true;
+    } catch (err) {
+      throw new Error("Could not reach NekoBT API");
+    }
+  }
+};
