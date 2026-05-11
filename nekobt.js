@@ -77,3 +77,4 @@ export default new class NekoBT {
     }
   }
 };
+
