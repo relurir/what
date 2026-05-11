@@ -5,6 +5,12 @@
   "version": "0.0.7",
   "type": "torrent",
   "accuracy": "high",
+
   "url": "https://nekobt.to/api/v1/",
-  "code": "https://exten.pages.dev/nekobt.js"
+
+  "code": "https://raw.githubusercontent.com/relurir/what/main/nekobt.js",
+
+  "update": "https://raw.githubusercontent.com/relurir/what/main/manifest.json",
+
+  "languages": ["US"]
 }
